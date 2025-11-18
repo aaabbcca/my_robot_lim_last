@@ -20,18 +20,18 @@ controller_server:
     progress_checker_plugin: "progress_checker"
     goal_checker_plugins: ["general_goal_checker"]
     controller_plugins: ["FollowPath"]
-    
+
     progress_checker:
       plugin: "nav2_controller::SimpleProgressChecker"
       required_movement_radius: 0.5
       movement_time_allowance: 10.0
-    
+
     general_goal_checker:
       plugin: "nav2_controller::SimpleGoalChecker"
       xy_goal_tolerance: 0.25
       yaw_goal_tolerance: 0.25
       stateful: True
-    
+
     FollowPath:
       plugin: "dwb_core::DWBLocalPlanner"
       debug_trajectory_details: True
@@ -61,7 +61,7 @@ controller_server:
       short_circuit_trajectory_evaluation: True
       stateful: True
       critics: ["RotateToGoal", "Oscillation", "BaseObstacle", "GoalAlign", "PathAlign", "PathDist", "GoalDist"]
-      BaseObstacle.scale: 0.02
+      BaseObstacle.scale: 0.005
       PathAlign.scale: 32.0
       PathAlign.forward_point_distance: 0.1
       GoalAlign.scale: 24.0
@@ -79,8 +79,8 @@ planner_server:
     planner_plugins: ["GridBased"]
     GridBased:
       plugin: "nav2_navfn_planner/NavfnPlanner"
-      tolerance: 2.0                      # 0.5 → 2.0 (더 관대하게)
-      use_astar: true                     # false → true (더 나은 경로)
+      tolerance: 2.0
+      use_astar: true
       allow_unknown: true
       use_final_approach_orientation: false
       default_tolerance: 2.0
@@ -92,33 +92,35 @@ behavior_server:
     robot_base_frame: base_footprint
     transform_tolerance: 0.1
 
-# Local Costmap (SLAM과 함께 사용 - static_layer 제거!)
+# Local Costmap (Inflation 제거, 강력한 필터링)
 local_costmap:
   local_costmap:
     ros__parameters:
       use_sim_time: True
       global_frame: odom
-      plugin_names: ["obstacle_layer", "inflation_layer"]
-      plugin_types: ["nav2_costmap_2d::ObstacleLayer", "nav2_costmap_2d::InflationLayer"]
+      plugin_names: ["obstacle_layer"]
+      plugin_types: ["nav2_costmap_2d::ObstacleLayer"]
       rolling_window: true
       width: 3
       height: 3
       resolution: 0.05
-      robot_radius: 0.22
-      inflation_layer:
-        cost_scaling_factor: 3.0
-        inflation_radius: 0.55
+      robot_radius: 0.12
       obstacle_layer:
         enabled: True
         observation_sources: scan
         scan:
           topic: /scan_filtered
           max_obstacle_height: 2.0
+          min_obstacle_height: 0.15
           clearing: True
           marking: True
           data_type: "LaserScan"
+          obstacle_max_range: 1.8
+          obstacle_min_range: 0.5
+          raytrace_max_range: 3.0
+          raytrace_min_range: 0.0
 
-# Global Costmap (SLAM의 /map 토픽 사용)
+# Global Costmap (Inflation 제거, 저장된 지도만 사용)
 global_costmap:
   global_costmap:
     ros__parameters:
@@ -129,34 +131,13 @@ global_costmap:
       publish_frequency: 1.0
       rolling_window: false
       resolution: 0.05
-
-      plugin_names: ["static_layer", "obstacle_layer", "inflation_layer"]
-      plugin_types: ["nav2_costmap_2d::StaticLayer", "nav2_costmap_2d::ObstacleLayer", "nav2_costmap_2d::InflationLayer"]
-      robot_radius: 0.22
+      plugin_names: ["static_layer"]
+      plugin_types: ["nav2_costmap_2d::StaticLayer"]
+      robot_radius: 0.12
       track_unknown_space: true
       always_send_full_costmap: true
-      
-      # SLAM의 /map 토픽 구독
+
       static_layer:
         enabled: True
         map_subscribe_transient_local: True
         map_topic: /map
-      
-      obstacle_layer:
-        enabled: True
-        observation_sources: scan
-        scan:
-          topic: /scan_filtered
-          max_obstacle_height: 2.0
-          clearing: True
-          marking: True
-          data_type: "LaserScan"
-          raytrace_max_range: 3.0
-          raytrace_min_range: 0.0
-          obstacle_max_range: 2.0
-          obstacle_min_range: 0.0
-      
-      inflation_layer:
-        enabled: True
-        cost_scaling_factor: 2.0
-        inflation_radius: 0.30
