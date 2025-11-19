@@ -9,6 +9,7 @@ bt_navigator:
     enable_groot_monitoring: True
     groot_zmq_publisher_port: 1666
     groot_zmq_server_port: 1667
+    # BT 플러그인 (추가 안정성)
     plugin_lib_names:
       - nav2_compute_path_to_pose_action_bt_node
       - nav2_follow_path_action_bt_node
@@ -53,14 +54,15 @@ controller_server:
       yaw_goal_tolerance: 0.25
       stateful: True
 
+    # DWB Local Planner - 센서 노이즈 없이 최적화
     FollowPath:
       plugin: "dwb_core::DWBLocalPlanner"
       debug_trajectory_details: True
       min_vel_x: 0.0
       min_vel_y: 0.0
-      max_vel_x: 0.5
+      max_vel_x: 0.5                    # 0.4 → 0.5 (더 빠르게)
       max_vel_y: 0.0
-      max_vel_theta: 1.8
+      max_vel_theta: 1.8                # 1.5 → 1.8 (회전 개선)
       min_speed_xy: 0.0
       max_speed_xy: 0.5
       min_speed_theta: 0.0
@@ -82,7 +84,7 @@ controller_server:
       short_circuit_trajectory_evaluation: True
       stateful: True
       critics: ["RotateToGoal", "Oscillation", "BaseObstacle", "GoalAlign", "PathAlign", "PathDist", "GoalDist"]
-      BaseObstacle.scale: 0.02
+      BaseObstacle.scale: 0.02          # 노이즈 없으므로 적절한 값
       PathAlign.scale: 32.0
       PathAlign.forward_point_distance: 0.1
       GoalAlign.scale: 24.0
@@ -96,7 +98,7 @@ controller_server:
 planner_server:
   ros__parameters:
     use_sim_time: True
-    expected_planner_frequency: 20.0
+    expected_planner_frequency: 20.0    # 1.0 → 20.0 (빠른 재계획)
     planner_plugins: ["GridBased"]
     GridBased:
       plugin: "nav2_navfn_planner/NavfnPlanner"
@@ -144,6 +146,7 @@ behavior_server:
     wait:
       plugin: "nav2_behaviors/Wait"
 
+# Local Costmap - 노이즈 제거로 더 정확한 감지
 local_costmap:
   local_costmap:
     ros__parameters:
@@ -153,11 +156,11 @@ local_costmap:
       update_frequency: 5.0
       publish_frequency: 2.0
       rolling_window: true
-      width: 6
-      height: 6
+      width: 6                          # 5 → 6 (넓은 시야)
+      height: 6                         # 5 → 6
       resolution: 0.05
       robot_radius: 0.12
-      track_unknown_space: true
+      track_unknown_space: true         # false → true (노이즈 없으므로 활성화)
       plugins: ["voxel_layer", "inflation_layer"]
       
       voxel_layer:
@@ -184,9 +187,10 @@ local_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         enabled: True
-        inflation_radius: 0.55
+        inflation_radius: 0.55           # 0.45 → 0.55 (안전 마진)
         cost_scaling_factor: 3.0
 
+# Global Costmap - Unknown space 통과 허용 유지
 global_costmap:
   global_costmap:
     ros__parameters:
@@ -196,14 +200,14 @@ global_costmap:
       update_frequency: 1.0
       publish_frequency: 1.0
       rolling_window: false
-      width: 50
-      height: 50
+      width: 50                          # 100 → 50 (효율성)
+      height: 50                         # 100 → 50
       resolution: 0.05
       robot_radius: 0.12
-      track_unknown_space: false
-      unknown_cost_value: 0
+      track_unknown_space: false        # Unknown 통과 허용
+      unknown_cost_value: 0              # Unknown 영역 비용 0
       lethal_cost_threshold: 100
-      trinary_costmap: true
+      trinary_costmap: true              # false → true (명확한 구분)
       use_maximum: false
       always_send_full_costmap: True
       plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
@@ -231,3 +235,106 @@ global_costmap:
         enabled: True
         inflation_radius: 0.55
         cost_scaling_factor: 3.0
+
+# Smoother Server - 부드러운 경로
+smoother_server:
+  ros__parameters:
+    use_sim_time: True
+    smoother_plugins: ["simple_smoother"]
+    simple_smoother:
+      plugin: "nav2_smoother::SimpleSmoother"
+      tolerance: 1.0e-10
+      max_its: 1000
+      do_refinement: True
+
+# Velocity Smoother - 급격한 속도 변화 방지
+velocity_smoother:
+  ros__parameters:
+    use_sim_time: True
+    smoothing_frequency: 20.0
+    scale_velocities: False
+    feedback: "OPEN_LOOP"
+    max_velocity: [0.5, 0.0, 1.8]
+    min_velocity: [-0.5, 0.0, -1.8]
+    max_accel: [2.5, 0.0, 3.2]
+    max_decel: [-2.5, 0.0, -3.2]
+    odom_topic: "odom"
+    odom_duration: 0.1
+    deadband_velocity: [0.0, 0.0, 0.0]
+    velocity_timeout: 1.0
+
+# Collision Monitor - 충돌 방지
+collision_monitor:
+  ros__parameters:
+    use_sim_time: True
+    base_frame_id: "base_footprint"
+    odom_frame_id: "odom"
+    cmd_vel_in_topic: "cmd_vel_smoothed"
+    cmd_vel_out_topic: "cmd_vel"
+    state_topic: "collision_monitor_state"
+    transform_tolerance: 0.2
+    source_timeout: 1.0
+    base_shift_correction: True
+    stop_pub_timeout: 2.0
+    polygons: ["FootprintApproach"]
+    FootprintApproach:
+      type: "polygon"
+      action_type: "approach"
+      footprint_topic: "/local_costmap/published_footprint"
+      time_before_collision: 1.2
+      simulation_time_step: 0.1
+      min_points: 6
+      visualize: False
+      enabled: True
+    observation_sources: ["scan"]
+    scan:
+      type: "scan"
+      topic: "/scan_filtered"
+      min_height: 0.15
+      max_height: 2.0
+      enabled: True
+
+# SLAM Toolbox 설정
+slam_toolbox:
+  ros__parameters:
+    odom_frame: odom
+    map_frame: map
+    base_frame: base_footprint
+    scan_topic: /scan_filtered
+    use_scan_matching: true
+    use_scan_barycenter: true
+    
+    # 레이저 범위 설정
+    minimum_laser_range: 0.3
+    maximum_laser_range: 15.0
+    
+    # 상관관계 검색 공간
+    correlation_search_space_dimension: 0.5
+    correlation_search_space_resolution: 0.01
+    correlation_search_space_smear_deviation: 0.1
+    
+    # 노이즈 감소 파라미터
+    minimum_travel_distance: 0.3
+    minimum_travel_heading: 0.3
+    
+    # 스캔 버퍼 설정
+    scan_buffer_size: 20
+    scan_buffer_maximum_scan_distance: 15.0
+    
+    # 기타 최적화
+    minimum_time_interval: 0.5
+    transform_timeout: 0.2
+    tf_buffer_duration: 30.0
+    stack_size_to_use: 40000000
+    
+    # 루프 클로저
+    do_loop_closing: true
+    loop_search_maximum_distance: 3.0
+    loop_match_minimum_chain_size: 10
+    loop_match_maximum_variance_coarse: 3.0
+    loop_match_minimum_response_coarse: 0.35
+    
+    # 스캔 매칭
+    minimum_angle_penalty: 0.9
+    minimum_distance_penalty: 0.5
+    use_response_expansion: true

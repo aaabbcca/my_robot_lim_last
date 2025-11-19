@@ -135,7 +135,7 @@
     </inertial>
   </link>
 
-  <!-- 2D LiDAR - Collision 제거! -->
+  <!-- 2D LiDAR -->
   <joint name="scan_joint" type="fixed">
     <parent link="base_link"/>
     <child link="base_scan"/>
@@ -150,7 +150,12 @@
       </geometry>
       <material name="dark"/>
     </visual>
-    <!-- ✅ collision 제거! 센서끼리 감지 방지 -->
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder length="0.0315" radius="0.055"/>
+      </geometry>
+    </collision>
     <inertial>
       <origin xyz="0 0 0"/>
       <mass value="0.114"/>
@@ -175,7 +180,7 @@
           </horizontal>
         </scan>
         <range>
-          <min>0.6</min>          <!-- 0.12 → 0.15 (카메라 피하기) -->
+          <min>0.12</min>
           <max>3.5</max>
           <resolution>0.015</resolution>
         </range>
@@ -195,7 +200,7 @@
     </sensor>
   </gazebo>
 
-  <!-- Center Depth Camera - Collision 제거! -->
+  <!-- Center Depth Camera (가로로 회전) -->
   <joint name="depth_camera_joint" type="fixed">
     <parent link="base_link"/>
     <child link="depth_camera_link"/>
@@ -210,7 +215,12 @@
       </geometry>
       <material name="black"/>
     </visual>
-    <!-- ✅ collision 제거! 센서끼리 감지 방지 -->
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.025 0.09 0.025"/>
+      </geometry>
+    </collision>
     <inertial>
       <origin xyz="0 0 0"/>
       <mass value="0.1"/>
@@ -253,7 +263,7 @@
     </sensor>
   </gazebo>
 
-  <!-- 3D LiDAR (Velodyne VLP-16) - Collision 제거! -->
+  <!-- 3D LiDAR (Velodyne VLP-16) -->
   <joint name="velodyne_joint" type="fixed">
     <parent link="base_link"/>
     <child link="velodyne_link"/>
@@ -268,7 +278,12 @@
       </geometry>
       <material name="black"/>
     </visual>
-    <!-- ✅ collision 제거! 센서끼리 감지 방지 -->
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder length="0.07" radius="0.05"/>
+      </geometry>
+    </collision>
     <inertial>
       <origin xyz="0 0 0"/>
       <mass value="0.5"/>
@@ -299,14 +314,14 @@
           </vertical>
         </scan>
         <range>
-          <min>0.6</min>              <!-- 0.5 → 0.15 (센서 간 거리 고려) -->
-          <max>20.0</max>              <!-- 100.0 → 20.0 (현실적 범위) -->
+          <min>0.5</min>
+          <max>100.0</max>
           <resolution>0.01</resolution>
         </range>
         <noise>
           <type>gaussian</type>
           <mean>0.0</mean>
-          <stddev>0.005</stddev>      <!-- 0.01 → 0.005 (노이즈 감소) -->
+          <stddev>0.01</stddev>
         </noise>
       </ray>
       <plugin name="gazebo_ros_velodyne" filename="libgazebo_ros_ray_sensor.so">
