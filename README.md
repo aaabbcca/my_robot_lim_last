@@ -111,7 +111,3 @@ my_robot_lim_last/
 - ROS2 Humble
 - Gazebo Classic
 - Python 3.10
-
----
-
-⭐ **이 프로젝트가 도움이 되셨다면 Star를 눌러주세요!** ⭐
